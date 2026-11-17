@@ -1,0 +1,473 @@
+TEST-LINE<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Reconciliation Dashboard · Odoo × Delivery Platforms (Demo)</title>
+<meta name="description" content="Demo dashboard that reconciles delivery-platform orders against Odoo sales orders. Fictional company and sample data.">
+<style>
+  .viz-root {
+    color-scheme: light;
+    --page: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --surface-2: #f0efec;
+    --border: #e2e0da;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #77756f;
+    --grid: #e7e5e0;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --accent: #2a78d6;
+    --good: #0ca30c;
+    --good-text: #006300;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --chip-good-bg: #e3f4e3;
+    --chip-warn-bg: #fdf1d6;
+    --chip-serious-bg: #fbe6dd;
+    --chip-critical-bg: #f8e0e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page: #121211;
+      --surface-1: #1a1a19;
+      --surface-2: #232321;
+      --border: #33332f;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #9a988f;
+      --grid: #2c2c29;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --accent: #3987e5;
+      --good-text: #4cc24c;
+      --chip-good-bg: #173117;
+      --chip-warn-bg: #3a2f12;
+      --chip-serious-bg: #3b2418;
+      --chip-critical-bg: #3a1a1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 20px 20px 48px; }
+  .demo-banner {
+    background: var(--surface-2); border: 1px dashed var(--border); color: var(--text-secondary);
+    padding: 8px 12px; border-radius: 8px; font-size: 12.5px; margin-bottom: 16px;
+  }
+  header.top { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--text-secondary); margin: 0; }
+  .sync { color: var(--text-muted); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 16px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { background: transparent; border: 0; padding: 6px 12px; font: inherit; color: var(--text-secondary); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); }
+  select, input[type="search"] {
+    font: inherit; color: var(--text-primary); background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+  }
+  .filters label { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
+  .spacer { flex: 1; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .kpi .label { color: var(--text-secondary); font-size: 12.5px; }
+  .kpi .value { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .note { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 2px; }
+  .card .hint { color: var(--text-muted); font-size: 12.5px; margin: 0 0 10px; }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .chart-box { position: relative; }
+  .chart-box svg { width: 100%; height: auto; display: block; }
+  .tip { position: absolute; pointer-events: none; background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; padding: 7px 9px; border-radius: 8px; white-space: nowrap; opacity: 0; transition: opacity .1s; z-index: 5; }
+  .tip b { font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { font-size: 12px; color: var(--text-muted); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface-1); }
+  th.num, td.num { text-align: right; }
+  tbody tr:hover { background: var(--surface-2); }
+  .table-wrap { overflow: auto; max-height: 460px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+  .diff-neg { color: var(--critical); }
+  .muted { color: var(--text-muted); }
+
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 2px 8px; border-radius: 999px; color: var(--text-primary); }
+  .chip svg { width: 12px; height: 12px; flex: none; }
+  .chip.amount { background: var(--chip-warn-bg); }
+  .chip.amount svg { color: #b57f00; }
+  .chip.missing-odoo { background: var(--chip-critical-bg); }
+  .chip.missing-odoo svg { color: var(--critical); }
+  .chip.missing-platform { background: var(--chip-serious-bg); }
+  .chip.missing-platform svg { color: var(--serious); }
+  .chip.status { background: var(--chip-serious-bg); }
+  .chip.status svg { color: var(--serious); }
+  .chip.resolved { background: var(--chip-good-bg); }
+  .chip.resolved svg { color: var(--good); }
+
+  .bar-cell { display: flex; align-items: center; gap: 8px; }
+  .bar-track { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; min-width: 60px; }
+  .bar-fill { height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .btn { font: inherit; background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .btn:hover { background: var(--surface-2); }
+  .count { color: var(--text-muted); font-size: 12.5px; }
+
+  .how { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .step { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .step .n { font-size: 12px; color: var(--accent); font-weight: 700; letter-spacing: .04em; }
+  .step h3 { font-size: 14px; margin: 4px 0 4px; }
+  .step p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  footer { color: var(--text-muted); font-size: 12px; margin-top: 24px; text-align: center; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body class="viz-root">
+<div class="wrap">
+
+  <div class="demo-banner">Portfolio demo · <b>FreshCart Grocers</b> is a fictional company and all orders below are generated sample data. "RushEats" and "CartGo" stand in for real delivery platforms.</div>
+
+  <header class="top">
+    <div>
+      <h1>Sales Reconciliation · Delivery Platforms vs Odoo</h1>
+      <p class="sub">Every platform order matched to its Odoo sales order by reference, amount and status.</p>
+    </div>
+    <div class="sync"><span class="dot" aria-hidden="true"></span><span id="syncText">Last sync: just now · next in 15 min</span></div>
+  </header>
+
+  <section class="filters" aria-label="Filters">
+    <div class="seg" role="group" aria-label="Date range">
+      <button type="button" data-range="7" aria-pressed="false">7 days</button>
+      <button type="button" data-range="14" aria-pressed="true">14 days</button>
+      <button type="button" data-range="30" aria-pressed="false">30 days</button>
+    </div>
+    <span><label for="fPlatform">Platform</label>
+      <select id="fPlatform"><option value="all">All platforms</option><option>RushEats</option><option>CartGo</option></select></span>
+    <span><label for="fOutlet">Outlet</label>
+      <select id="fOutlet"><option value="all">All outlets</option></select></span>
+    <span class="spacer"></span>
+    <button class="btn" type="button" id="resyncBtn">↻ Re-run reconciliation</button>
+  </section>
+
+  <section class="kpis" aria-label="Key figures">
+    <div class="kpi"><div class="label">Platform orders</div><div class="value" id="kOrders">–</div><div class="note" id="kOrdersNote"></div></div>
+    <div class="kpi"><div class="label">Match rate</div><div class="value" id="kRate">–</div><div class="note">reference + amount + status</div></div>
+    <div class="kpi"><div class="label">Open exceptions</div><div class="value" id="kOpen">–</div><div class="note" id="kOpenNote"></div></div>
+    <div class="kpi"><div class="label">Value at risk</div><div class="value" id="kRisk">–</div><div class="note">unmatched + amount gaps</div></div>
+    <div class="kpi"><div class="label">Missing in Odoo</div><div class="value" id="kMissing">–</div><div class="note">sold on platform, not invoiced</div></div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>Daily orders: matched vs exceptions</h2>
+      <p class="hint">Hover a day for the breakdown.</p>
+      <div class="legend"><span><i style="background:var(--series-1)"></i>Matched</span><span><i style="background:var(--series-2)"></i>Exceptions</span></div>
+      <div class="chart-box" id="chartBox">
+        <svg id="chart" viewBox="0 0 720 260" role="img" aria-labelledby="chartTitle"><title id="chartTitle">Daily matched and exception order counts</title></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Match rate by outlet</h2>
+      <p class="hint">Lowest first, so problem stores surface at the top.</p>
+      <div class="table-wrap" style="max-height:300px">
+        <table id="outletTable" aria-label="Match rate by outlet">
+          <thead><tr><th>Outlet</th><th class="num">Orders</th><th>Match rate</th><th class="num">Open</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <h2>Exceptions to review</h2>
+    <p class="hint">Click a column header to sort. Export sends the current view to CSV for the finance team.</p>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search order ref, outlet…" aria-label="Search exceptions">
+      <select id="fIssue" aria-label="Issue type">
+        <option value="all">All issue types</option>
+        <option value="amount">Amount mismatch</option>
+        <option value="missing-odoo">Missing in Odoo</option>
+        <option value="missing-platform">Missing on platform</option>
+        <option value="status">Status conflict</option>
+      </select>
+      <select id="fState" aria-label="Resolution state">
+        <option value="open">Open only</option>
+        <option value="all">Open + resolved</option>
+      </select>
+      <span class="spacer"></span>
+      <span class="count" id="exCount"></span>
+      <button class="btn" type="button" id="exportBtn">Export CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table id="exTable">
+        <thead><tr>
+          <th data-k="date">Date</th>
+          <th data-k="outlet">Outlet</th>
+          <th data-k="platform">Platform</th>
+          <th data-k="pref">Platform ref</th>
+          <th data-k="oref">Odoo order</th>
+          <th data-k="pAmt" class="num">Platform $</th>
+          <th data-k="oAmt" class="num">Odoo $</th>
+          <th data-k="diff" class="num">Difference</th>
+          <th data-k="issue">Issue</th>
+          <th data-k="resolved">State</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <h2 style="font-size:15px;margin:24px 0 10px">How it works</h2>
+  <section class="how">
+    <div class="step"><div class="n">01 · PULL</div><h3>Platform orders</h3><p>Order exports from each delivery platform are pulled on a schedule (API or CSV drop) and normalised into one format.</p></div>
+    <div class="step"><div class="n">02 · READ</div><h3>Odoo sales orders</h3><p>Read-only XML-RPC calls fetch <span class="mono">sale.order</span> records for the same window, batched and filtered to keep load on the ERP low.</p></div>
+    <div class="step"><div class="n">03 · MATCH</div><h3>Reconcile</h3><p>Orders are matched on the platform reference stored in Odoo, then checked for amount and status. Anything that fails a rule becomes an exception.</p></div>
+    <div class="step"><div class="n">04 · ALERT</div><h3>Act on it</h3><p>Open exceptions show here, and email alerts go out when the match rate drops or orders go missing, so the team fixes them the same day.</p></div>
+  </section>
+
+  <footer>Demo built by Brayan W. · The production version reads Odoo through its API; this page runs on generated data in the browser.</footer>
+</div>
+
+<script>
+(() => {
+  // ---------- Sample data (seeded so it is stable between reloads) ----------
+  let seed = 20261117;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const OUTLETS = ["Harbour Road", "Lake View", "Central Market", "Hillside", "Riverside", "Station Square"];
+  const PLATFORMS = ["RushEats", "CartGo"];
+  const DAYS = 30;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const iso = d => d.toISOString().slice(0, 10);
+
+  let orders = [];
+  let soCounter = 41820;
+  function generate() {
+    orders = [];
+    for (let d = DAYS - 1; d >= 0; d--) {
+      const day = new Date(today); day.setDate(day.getDate() - d);
+      const dateStr = iso(day);
+      const weekend = [0, 6].includes(day.getDay());
+      OUTLETS.forEach((outlet, oi) => {
+        PLATFORMS.forEach(platform => {
+          const base = 6 + oi % 3 * 2 + (platform === "RushEats" ? 3 : 0) + (weekend ? 4 : 0);
+          const n = base + Math.floor(rnd() * 5);
+          // one weaker outlet, to make the outlet table interesting
+          const errBoost = outlet === "Hillside" ? 2.2 : 1;
+          for (let i = 0; i < n; i++) {
+            const amt = Math.round((8 + rnd() * 62) * 100) / 100;
+            const pref = (platform === "RushEats" ? "RE-" : "CG-") + Math.floor(100000 + rnd() * 899999);
+            const r = rnd();
+            let issue = null, pAmt = amt, oAmt = amt, oref = "S" + (soCounter++);
+            if (r < 0.030 * errBoost) { issue = "amount"; oAmt = Math.round((amt - (0.5 + rnd() * 9)) * 100) / 100; }
+            else if (r < 0.050 * errBoost) { issue = "missing-odoo"; oAmt = null; oref = null; }
+            else if (r < 0.062 * errBoost) { issue = "status"; }
+            else if (r < 0.072 * errBoost) { issue = "missing-platform"; pAmt = null; }
+            const resolved = issue ? (d > 3 ? rnd() < 0.8 : rnd() < 0.15) : false;
+            orders.push({ date: dateStr, outlet, platform, pref: issue === "missing-platform" ? "—" : pref,
+              oref: oref || "—", pAmt, oAmt, issue, resolved,
+              diff: (pAmt != null && oAmt != null) ? Math.round((oAmt - pAmt) * 100) / 100 : null });
+          }
+        });
+      });
+    }
+  }
+
+  // ---------- State ----------
+  const state = { range: 14, platform: "all", outlet: "all", issue: "all", openOnly: true, q: "", sortK: "date", sortDir: -1 };
+  const $ = id => document.getElementById(id);
+  const fmtMoney = v => "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtInt = v => v.toLocaleString();
+  const ISSUE = {
+    "amount": ["Amount mismatch", '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1 11 10H1z" fill="currentColor"/></svg>'],
+    "missing-odoo": ["Missing in Odoo", '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="currentColor"/><path d="M4 4l4 4M8 4 4 8" stroke="#fff" stroke-width="1.4"/></svg>'],
+    "missing-platform": ["Missing on platform", '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" fill="currentColor"/><path d="M6 3v4M6 8.6v.4" stroke="#fff" stroke-width="1.4"/></svg>'],
+    "status": ["Status conflict", '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1 11 6 6 11 1 6z" fill="currentColor"/></svg>']
+  };
+  const CHECK = '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="currentColor"/><path d="M3.5 6.2 5.2 7.8 8.5 4.5" stroke="#fff" stroke-width="1.4" fill="none"/></svg>';
+
+  outletsInit();
+  function outletsInit() {
+    const s = $("fOutlet");
+    OUTLETS.forEach(o => { const op = document.createElement("option"); op.textContent = o; s.appendChild(op); });
+  }
+
+  function scoped() {
+    const from = new Date(today); from.setDate(from.getDate() - (state.range - 1));
+    const f = iso(from);
+    return orders.filter(o => o.date >= f &&
+      (state.platform === "all" || o.platform === state.platform) &&
+      (state.outlet === "all" || o.outlet === state.outlet));
+  }
+
+  // ---------- KPIs ----------
+  function renderKpis(rows) {
+    const platformOrders = rows.filter(o => o.issue !== "missing-platform").length;
+    const matched = rows.filter(o => !o.issue).length;
+    const open = rows.filter(o => o.issue && !o.resolved);
+    const risk = open.reduce((s, o) => s + (o.issue === "amount" ? Math.abs(o.diff) : (o.pAmt ?? o.oAmt ?? 0)), 0);
+    $("kOrders").textContent = fmtInt(platformOrders);
+    $("kOrdersNote").textContent = fmtInt(rows.length - rows.filter(o => o.issue === "missing-odoo").length) + " Odoo orders in range";
+    $("kRate").textContent = (rows.length ? (matched / rows.length * 100) : 0).toFixed(1) + "%";
+    $("kOpen").textContent = fmtInt(open.length);
+    $("kOpenNote").textContent = fmtInt(rows.filter(o => o.issue && o.resolved).length) + " already resolved";
+    $("kRisk").textContent = fmtMoney(risk);
+    $("kMissing").textContent = fmtInt(rows.filter(o => o.issue === "missing-odoo" && !o.resolved).length);
+  }
+
+  // ---------- Chart (stacked bars, 2px gap, rounded top) ----------
+  function renderChart(rows) {
+    const svg = $("chart");
+    const W = 720, H = 260, m = { t: 12, r: 8, b: 28, l: 40 };
+    const days = [];
+    for (let i = state.range - 1; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); days.push(iso(d)); }
+    const byDay = days.map(d => {
+      const r = rows.filter(o => o.date === d);
+      return { d, matched: r.filter(o => !o.issue).length, ex: r.filter(o => o.issue).length };
+    });
+    const max = Math.max(1, ...byDay.map(x => x.matched + x.ex));
+    const niceMax = Math.ceil(max / 50) * 50;
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const step = iw / days.length, bw = Math.max(4, Math.min(28, step * 0.62));
+    const y = v => m.t + ih - v / niceMax * ih;
+    let s = `<title id="chartTitle">Daily matched and exception order counts</title>`;
+    for (let g = 0; g <= 4; g++) {
+      const v = niceMax / 4 * g, yy = y(v);
+      s += `<line x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>`;
+      s += `<text x="${m.l - 6}" y="${yy + 4}" text-anchor="end" font-size="11" fill="var(--text-muted)">${v}</text>`;
+    }
+    const labelEvery = days.length > 14 ? 5 : (days.length > 7 ? 2 : 1);
+    byDay.forEach((b, i) => {
+      const x = m.l + step * i + (step - bw) / 2;
+      const yM = y(b.matched), hM = m.t + ih - yM;
+      const yE = y(b.matched + b.ex), hE = Math.max(0, yM - yE - 2);
+      // matched segment sits on the baseline (square), exceptions on top with rounded data-end
+      s += `<rect x="${x}" y="${yM}" width="${bw}" height="${hM}" fill="var(--series-1)"/>`;
+      if (b.ex > 0) s += roundTop(x, yE, bw, hE, Math.min(4, bw / 2), "var(--series-2)");
+      if (i % labelEvery === 0 || i === days.length - 1) {
+        const dt = new Date(b.d + "T00:00:00");
+        s += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${dt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</text>`;
+      }
+      s += `<rect class="hit" data-i="${i}" x="${m.l + step * i}" y="${m.t}" width="${step}" height="${ih}" fill="transparent"/>`;
+    });
+    svg.innerHTML = s;
+    const tip = $("tip"), box = $("chartBox");
+    svg.querySelectorAll(".hit").forEach(h => {
+      h.addEventListener("mousemove", e => {
+        const b = byDay[+h.dataset.i];
+        const dt = new Date(b.d + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        const tot = b.matched + b.ex;
+        tip.innerHTML = `<b>${dt}</b><br>Matched: ${b.matched}<br>Exceptions: ${b.ex}<br>Match rate: ${tot ? (b.matched / tot * 100).toFixed(1) : "0"}%`;
+        const r = box.getBoundingClientRect();
+        let left = e.clientX - r.left + 12; if (left > r.width - 150) left -= 170;
+        tip.style.left = left + "px"; tip.style.top = (e.clientY - r.top - 10) + "px"; tip.style.opacity = 1;
+      });
+      h.addEventListener("mouseleave", () => tip.style.opacity = 0);
+    });
+  }
+  function roundTop(x, y, w, h, r, fill) {
+    if (h <= 0) return "";
+    r = Math.min(r, h);
+    return `<path d="M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z" fill="${fill}"/>`;
+  }
+
+  // ---------- Outlet table ----------
+  function renderOutlets(rows) {
+    const list = OUTLETS.map(o => {
+      const r = rows.filter(x => x.outlet === o);
+      const m = r.filter(x => !x.issue).length;
+      return { o, n: r.length, rate: r.length ? m / r.length * 100 : 100, open: r.filter(x => x.issue && !x.resolved).length };
+    }).filter(x => x.n > 0).sort((a, b) => a.rate - b.rate);
+    $("outletTable").querySelector("tbody").innerHTML = list.map(x => `
+      <tr><td>${x.o}</td><td class="num">${fmtInt(x.n)}</td>
+      <td><div class="bar-cell"><div class="bar-track"><div class="bar-fill" style="width:${Math.max(0, (x.rate - 80) / 20 * 100)}%"></div></div><span>${x.rate.toFixed(1)}%</span></div></td>
+      <td class="num">${x.open}</td></tr>`).join("");
+  }
+
+  // ---------- Exceptions table ----------
+  let currentEx = [];
+  function renderExceptions(rows) {
+    const q = state.q.trim().toLowerCase();
+    currentEx = rows.filter(o => o.issue &&
+      (state.issue === "all" || o.issue === state.issue) &&
+      (!state.openOnly || !o.resolved) &&
+      (!q || [o.pref, o.oref, o.outlet, o.platform].join(" ").toLowerCase().includes(q)));
+    const k = state.sortK, dir = state.sortDir;
+    currentEx.sort((a, b) => {
+      const va = a[k] ?? -Infinity, vb = b[k] ?? -Infinity;
+      return (va > vb ? 1 : va < vb ? -1 : 0) * dir;
+    });
+    $("exCount").textContent = `${currentEx.length} exception${currentEx.length === 1 ? "" : "s"}`;
+    const money = v => v == null ? '<span class="muted">—</span>' : fmtMoney(v);
+    $("exTable").querySelector("tbody").innerHTML = currentEx.slice(0, 400).map(o => `
+      <tr>
+        <td>${o.date}</td><td>${o.outlet}</td><td>${o.platform}</td>
+        <td class="mono">${o.pref}</td><td class="mono">${o.oref}</td>
+        <td class="num">${money(o.pAmt)}</td><td class="num">${money(o.oAmt)}</td>
+        <td class="num ${o.diff && o.diff < 0 ? "diff-neg" : ""}">${o.diff == null || o.diff === 0 ? '<span class="muted">—</span>' : (o.diff > 0 ? "+" : "−") + fmtMoney(Math.abs(o.diff))}</td>
+        <td><span class="chip ${o.issue}">${ISSUE[o.issue][1]}${ISSUE[o.issue][0]}</span></td>
+        <td>${o.resolved ? `<span class="chip resolved">${CHECK}Resolved</span>` : '<span class="muted">Open</span>'}</td>
+      </tr>`).join("") || `<tr><td colspan="10" class="muted" style="padding:20px">No exceptions for this filter. 🎉</td></tr>`;
+  }
+
+  function render() {
+    const rows = scoped();
+    renderKpis(rows); renderChart(rows); renderOutlets(rows); renderExceptions(rows);
+  }
+
+  // ---------- Events ----------
+  document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true"); state.range = +b.dataset.range; render();
+  }));
+  $("fPlatform").addEventListener("change", e => { state.platform = e.target.value; render(); });
+  $("fOutlet").addEventListener("change", e => { state.outlet = e.target.value; render(); });
+  $("fIssue").addEventListener("change", e => { state.issue = e.target.value; renderExceptions(scoped()); });
+  $("fState").addEventListener("change", e => { state.openOnly = e.target.value === "open"; renderExceptions(scoped()); });
+  $("search").addEventListener("input", e => { state.q = e.target.value; renderExceptions(scoped()); });
+  document.querySelectorAll("#exTable th").forEach(th => th.addEventListener("click", () => {
+    const k = th.dataset.k; state.sortDir = state.sortK === k ? -state.sortDir : 1; state.sortK = k; renderExceptions(scoped());
+  }));
+  $("exportBtn").addEventListener("click", () => {
+    const head = ["date", "outlet", "platform", "platform_ref", "odoo_order", "platform_amount", "odoo_amount", "difference", "issue", "state"];
+    const lines = [head.join(",")].concat(currentEx.map(o => [o.date, o.outlet, o.platform, o.pref, o.oref, o.pAmt ?? "", o.oAmt ?? "", o.diff ?? "", ISSUE[o.issue][0], o.resolved ? "Resolved" : "Open"]
+      .map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")));
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "reconciliation-exceptions.csv"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $("resyncBtn").addEventListener("click", () => {
+    const b = $("resyncBtn"); b.disabled = true; b.textContent = "Reconciling…";
+    setTimeout(() => {
+      b.disabled = false; b.textContent = "↻ Re-run reconciliation";
+      const t = new Date(); $("syncText").textContent = `Last sync: ${t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · next in 15 min`;
+    }, 900);
+  });
+
+  generate();
+  render();
+})();
+</script>
+</body>
+</html>
